@@ -1,3 +1,4 @@
+import { startOrderWorker } from "./workers/order-worker";
 import express from "express";
 import cors from "cors";
 import { logger } from "./lib/logger";
@@ -67,6 +68,8 @@ app.get("/sse/:tenantId", authMiddleware, async (req, res) => {
   }
   await addSSEClient(tenantId, req, res);
 });
+
+startOrderWorker();
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, "DropFlow worker started");
