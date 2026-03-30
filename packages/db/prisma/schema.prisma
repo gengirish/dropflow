@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ── ENUMS ─────────────────────────────────────────────────
+
+enum TenantPlan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum Currency {
+  INR
+  USD
+  EUR
+  GBP
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum OrderStatus {
+  PENDING
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  ROUTING
+  PO_CREATED
+  SUPPLIER_CONFIRMED
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+  REFUNDED
+}
+
+enum GSTType {
+  CGST_SGST
+  IGST
+  EXPORT_LUT
+  EXEMPT
+}
+
+enum WorkflowStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  PAUSED
+  CANCELLED
+}
+
+enum ShipmentCarrier {
+  SHIPROCKET
+  DELHIVERY
+  DTDC
+  BLUEDART
+  EASYPOST_DHL
+  EASYPOST_FEDEX
+  EASYPOST_UPS
+  SELF
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+  IN_APP
+}
+
+// ── TENANT & USERS ────────────────────────────────────────
+
+model Tenant {
+  id                String     @id @default(cuid())
+  clerkOrgId        String     @unique
+  slug              String     @unique
+  name              String
+  plan              TenantPlan @default(STARTER)
+  gstin             String?
+  pan               String?
+  iecCode           String?
+  defaultCurrency   Currency   @default(INR)
+  sellerStateCode   String?
+  workflowConfigJson Json      @default("{}")
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  suppliers         Supplier[]
+  products          Product[]
+  orders            Order[]
+  invoices          Invoice[]
+  shipments         Shipment[]
+  workflowDefs      WorkflowDefinition[]
+  workflowRuns      WorkflowRun[]
+
+  @@map("tenants")
+}
+
+// ── SUPPLIERS ─────────────────────────────────────────────
+
+model Supplier {
+  id             String         @id @default(cuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  name           String
+  contactEmail   String?
+  contactPhone   String?
+  gstin          String?
+  status         SupplierStatus @default(ACTIVE)
+  leadTimeDays   Int            @default(3)
+  returnWindowDays Int          @default(7)
+  metaJson       Json           @default("{}")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+// ── CATALOG ───────────────────────────────────────────────
+
+model Product {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  supplierId          String
+  supplier            Supplier  @relation(fields: [supplierId], references: [id])
+  sku                 String
+  name                String
+  description         String?
+  hsnCode             String
+  costPricePaise      Int
+  sellingPricePaise   Int
+  marginPercent       Float
+  gstRatePercent      Int
+  stockQty            Int       @default(0)
+  reservedQty         Int       @default(0)
+  lowStockThreshold   Int       @default(10)
+  isActive            Boolean   @default(true)
+  isListed            Boolean   @default(true)
+  images              String[]
+  metaJson            Json      @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  variants            ProductVariant[]
+  orderItems          OrderItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id               String   @id @default(cuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id])
+  tenantId         String
+  name             String
+  sku              String
+  costPricePaise   Int
+  sellingPricePaise Int
+  stockQty         Int      @default(0)
+  attributes       Json     @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("product_variants")
+}
+
+// ── ORDERS ────────────────────────────────────────────────
+
+model Order {
+  id                String      @id @default(cuid())
+  tenantId          String
+  tenant            Tenant      @relation(fields: [tenantId], references: [id])
+  orderNumber       String
+  buyerName         String
+  buyerEmail        String
+  buyerPhone        String
+  shippingAddress   Json
+  billingAddress    Json
+  status            OrderStatus @default(PENDING)
+  currency          Currency    @default(INR)
+  subtotalPaise     Int
+  discountPaise     Int         @default(0)
+  shippingFeePaise  Int         @default(0)
+  totalPaise        Int
+  taxPaise          Int
+  notes             String?
+  workflowRunId     String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  items             OrderItem[]
+  purchaseOrder     PurchaseOrder?
+  invoice           Invoice?
+  shipment          Shipment?
+  payments          Payment[]
+  statusHistory     OrderStatusHistory[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String   @id @default(cuid())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [id])
+  tenantId         String
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id])
+  variantId        String?
+  quantity         Int
+  unitPricePaise   Int
+  totalPaise       Int
+  hsnCode          String
+
+  @@index([tenantId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id])
+  tenantId  String
+  status    OrderStatus
+  note      String?
+  actorId   String?
+  createdAt DateTime    @default(now())
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+// ── PURCHASE ORDERS ───────────────────────────────────────
+
+model PurchaseOrder {
+  id            String    @id @default(cuid())
+  orderId       String    @unique
+  order         Order     @relation(fields: [orderId], references: [id])
+  tenantId      String
+  supplierId    String
+  supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  poNumber      String
+  totalPaise    Int
+  status        String    @default("SENT")
+  sentAt        DateTime?
+  acknowledgedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@map("purchase_orders")
+}
+
+// ── INVOICES ──────────────────────────────────────────────
+
+model Invoice {
+  id               String   @id @default(cuid())
+  orderId          String   @unique
+  order            Order    @relation(fields: [orderId], references: [id])
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  invoiceNumber    String
+  gstType          GSTType
+  subtotalPaise    Int
+  cgstPaise        Int      @default(0)
+  sgstPaise        Int      @default(0)
+  igstPaise        Int      @default(0)
+  totalTaxPaise    Int
+  totalPaise       Int
+  currency         Currency @default(INR)
+  irpAckNumber     String?
+  irpAckDate       DateTime?
+  eWayBillNumber   String?
+  pdfUrl           String?
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("invoices")
+}
+
+// ── SHIPMENTS ─────────────────────────────────────────────
+
+model Shipment {
+  id                  String          @id @default(cuid())
+  orderId             String          @unique
+  order               Order           @relation(fields: [orderId], references: [id])
+  tenantId            String
+  tenant              Tenant          @relation(fields: [tenantId], references: [id])
+  carrier             ShipmentCarrier
+  awbNumber           String?
+  labelUrl            String?
+  trackingUrl         String?
+  trackingStatus      String          @default("PENDING")
+  isInternational     Boolean         @default(false)
+  estimatedDelivery   DateTime?
+  deliveredAt         DateTime?
+  weightGrams         Int?
+  dimensions          Json?
+  customsDeclaration  Json?
+  carrierResponse     Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  trackingEvents      TrackingEvent[]
+
+  @@index([tenantId])
+  @@map("shipments")
+}
+
+model TrackingEvent {
+  id          String    @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id])
+  tenantId    String
+  status      String
+  description String
+  location    String?
+  eventTime   DateTime
+  rawJson     Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([shipmentId])
+  @@map("tracking_events")
+}
+
+// ── PAYMENTS ──────────────────────────────────────────────
+
+model Payment {
+  id               String   @id @default(cuid())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [id])
+  tenantId         String
+  gateway          String
+  gatewayPaymentId String
+  gatewayOrderId   String?
+  amountPaise      Int
+  currency         Currency @default(INR)
+  status           String
+  capturedAt       DateTime?
+  refundedAt       DateTime?
+  metaJson         Json     @default("{}")
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([gatewayPaymentId])
+  @@map("payments")
+}
+
+// ── WORKFLOW ENGINE ───────────────────────────────────────
+
+model WorkflowDefinition {
+  id          String         @id @default(cuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  name        String
+  trigger     String
+  version     Int            @default(1)
+  status      WorkflowStatus @default(ACTIVE)
+  dagJson     Json
+  configJson  Json           @default("{}")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  runs        WorkflowRun[]
+
+  @@unique([tenantId, name, version])
+  @@index([tenantId])
+  @@map("workflow_definitions")
+}
+
+model WorkflowRun {
+  id                   String           @id @default(cuid())
+  workflowDefinitionId String
+  workflowDef          WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id])
+  tenantId             String
+  tenant               Tenant           @relation(fields: [tenantId], references: [id])
+  triggerId            String
+  status               WorkflowRunStatus @default(RUNNING)
+  currentStep          String?
+  contextJson          Json              @default("{}")
+  auditLog             Json[]            @default([])
+  startedAt            DateTime          @default(now())
+  completedAt          DateTime?
+  failedAt             DateTime?
+  errorMessage         String?
+
+  @@index([tenantId])
+  @@index([workflowDefinitionId])
+  @@map("workflow_runs")
+}

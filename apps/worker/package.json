@@ -1,0 +1,36 @@
+{
+  "name": "worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bull-board/api": "^6.20.0",
+    "@bull-board/express": "^6.20.0",
+    "@dropflow/config": "workspace:*",
+    "@dropflow/db": "workspace:*",
+    "@dropflow/gst": "workspace:*",
+    "@dropflow/types": "workspace:*",
+    "better-sse": "^0.16.0",
+    "bullmq": "^5.71.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "ioredis": "^5.4.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
