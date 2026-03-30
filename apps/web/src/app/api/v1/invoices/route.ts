@@ -67,9 +67,18 @@ export async function POST(req: NextRequest) {
     });
     if (existing) return ok(existing);
 
-    const { calculateGST } = await import("@dropflow/gst");
-    const buyerState = (order.shippingAddress as Record<string, string>)?.state ?? null;
+    const { calculateGST, STATE_CODES } = await import("@dropflow/gst");
+    const buyerStateName = (order.shippingAddress as Record<string, string>)?.state ?? null;
     const sellerState = tenant.sellerStateCode ?? "29";
+
+    // Resolve state name to code (e.g., "Karnataka" -> "29")
+    let buyerState: string | null = null;
+    if (buyerStateName) {
+      const stateEntry = Object.entries(STATE_CODES).find(
+        ([, name]) => name.toLowerCase() === buyerStateName.toLowerCase(),
+      );
+      buyerState = stateEntry ? stateEntry[0] : buyerStateName;
+    }
 
     let totalCgst = 0;
     let totalSgst = 0;
