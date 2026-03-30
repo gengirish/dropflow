@@ -3,11 +3,13 @@ import { headers } from "next/headers";
 import { prisma } from "@dropflow/db";
 
 export async function getAuthTenant() {
-  // E2E test mode: bypass Clerk and use test tenant
-  if (process.env.NEXT_PUBLIC_APP_ENV === "development") {
+  const appEnv = (process.env.NEXT_PUBLIC_APP_ENV ?? "").trim();
+  const e2eKey = (process.env.E2E_TEST_KEY ?? "").trim();
+
+  if (appEnv === "development" && e2eKey) {
     const headersList = await headers();
-    const testKey = headersList.get("x-e2e-test-key");
-    if (testKey && testKey === process.env.E2E_TEST_KEY) {
+    const testKey = headersList.get("x-e2e-test-key")?.trim();
+    if (testKey && testKey === e2eKey) {
       const tenant = await prisma.tenant.findFirst({
         where: { clerkOrgId: "org_test_dropflow" },
       });
@@ -38,7 +40,7 @@ export async function getAuthTenant() {
   return { userId, orgId, tenantId: tenant.id, tenant };
 }
 
-export async function requireAuth(req?: Request) {
+export async function requireAuth(_req?: Request) {
   const { userId, orgId } = await auth();
 
   if (!userId) {

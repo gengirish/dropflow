@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "prisma generate --schema=../../packages/db/prisma/schema.prisma"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",
@@ -38,7 +39,9 @@
     "react-hook-form": "^7.54.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "@prisma/client": "^6.19.0",
+    "prisma": "^6.19.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

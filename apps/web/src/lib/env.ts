@@ -24,6 +24,11 @@ export type Env = z.infer<typeof envSchema>;
 function parseEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
+    // During build, env vars may not be available — log but don't crash
+    if (process.env.VERCEL || process.env.CI) {
+      console.warn("Env validation skipped during build:", parsed.error.flatten().fieldErrors);
+      return process.env as unknown as Env;
+    }
     console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
     throw new Error("Invalid environment variables");
   }

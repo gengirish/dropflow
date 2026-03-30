@@ -10,3 +10,8 @@ coverage/
 .vercel
 .fly/
 *.jsx
+packages/db/src/generated/
+.prisma/
+test-results/
+
+.vercel

@@ -9,20 +9,21 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 function handleRequest(req: NextRequest) {
-  // E2E test bypass: skip Clerk entirely when test header matches in development
+  const appEnv = (process.env.NEXT_PUBLIC_APP_ENV ?? "").trim();
+  const e2eKey = (process.env.E2E_TEST_KEY ?? "").trim();
+
   const isE2E =
-    process.env.NEXT_PUBLIC_APP_ENV === "development" &&
-    process.env.E2E_TEST_KEY &&
-    req.headers.get("x-e2e-test-key") === process.env.E2E_TEST_KEY;
+    appEnv === "development" &&
+    e2eKey &&
+    req.headers.get("x-e2e-test-key")?.trim() === e2eKey;
 
   if (isE2E) {
     return NextResponse.next();
   }
 
-  // If Clerk keys aren't configured (placeholder), skip auth for development
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+  const publishableKey = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "").trim();
   if (!publishableKey.startsWith("pk_live_") && !publishableKey.startsWith("pk_test_cl")) {
-    if (isPublicRoute(req) || process.env.NEXT_PUBLIC_APP_ENV === "development") {
+    if (isPublicRoute(req) || appEnv === "development") {
       return NextResponse.next();
     }
   }
