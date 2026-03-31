@@ -180,4 +180,74 @@ test.describe.serial("Production E2E — Full Order Flow", () => {
     expect(json.success).toBe(true);
     expect(json.data.length).toBeGreaterThan(0);
   });
+
+  test("13. Analytics — dashboard KPIs", async ({ request }) => {
+    const res = await request.get(`${API}/analytics/dashboard`, { headers: H });
+    expect(res.ok()).toBe(true);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.data).toHaveProperty("totalRevenuePaise");
+    expect(json.data).toHaveProperty("totalProfitPaise");
+    expect(json.data).toHaveProperty("avgMarginPercent");
+    expect(json.data).toHaveProperty("totalOrders");
+    expect(json.data).toHaveProperty("returnRate");
+    expect(json.data.totalOrders).toBeGreaterThanOrEqual(0);
+  });
+
+  test("14. Analytics — revenue time series", async ({ request }) => {
+    const res = await request.get(`${API}/analytics/revenue?granularity=DAILY`, {
+      headers: H,
+    });
+    expect(res.ok()).toBe(true);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+  });
+
+  test("15. Analytics — unit economics", async ({ request }) => {
+    const res = await request.get(`${API}/analytics/unit-economics`, {
+      headers: H,
+    });
+    expect(res.ok()).toBe(true);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+  });
+
+  test("16. Workflows — list definitions", async ({ request }) => {
+    const res = await request.get(`${API}/workflows`, { headers: H });
+    expect(res.ok()).toBe(true);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+  });
+
+  test("17. Workflows — create workflow", async ({ request }) => {
+    const res = await request.post(`${API}/workflows`, {
+      headers: H,
+      data: {
+        name: `E2E Test Workflow ${Date.now()}`,
+        trigger: "order.created",
+        nodes: [
+          {
+            id: "step-1",
+            type: "action",
+            handler: "validate-stock",
+            label: "Validate Stock",
+            position: { x: 250, y: 0 },
+          },
+          {
+            id: "step-2",
+            type: "action",
+            handler: "route-to-supplier",
+            label: "Route to Supplier",
+            position: { x: 250, y: 200 },
+          },
+        ],
+        edges: [{ id: "e1", source: "step-1", target: "step-2" }],
+      },
+    });
+    expect([200, 201]).toContain(res.status());
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.data).toHaveProperty("id");
+    expect(json.data.name).toContain("E2E Test Workflow");
+  });
 });
