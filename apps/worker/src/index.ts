@@ -1,4 +1,6 @@
 import { startOrderWorker } from "./workers/order-worker";
+import { startAnalyticsWorker } from "./workers/analytics-worker";
+import { startNotificationWorker } from "./workers/notification-worker";
 import express from "express";
 import cors from "cors";
 import { logger } from "./lib/logger";
@@ -44,7 +46,8 @@ app.post("/internal/enqueue", authMiddleware, async (req, res) => {
       return;
     }
 
-    const job = await queue.add(input.queue, input.payload, {
+    const bullJobName = input.jobName ?? input.queue;
+    const job = await queue.add(bullJobName, input.payload, {
       attempts: 3,
       backoff: { type: "exponential", delay: 2000 },
       removeOnComplete: { count: 1000 },
@@ -52,7 +55,10 @@ app.post("/internal/enqueue", authMiddleware, async (req, res) => {
       ...input.options,
     });
 
-    logger.info({ queue: input.queue, jobId: job.id }, "Job enqueued");
+    logger.info(
+      { queue: input.queue, jobName: bullJobName, jobId: job.id },
+      "Job enqueued",
+    );
     res.json({ jobId: job.id });
   } catch (error) {
     logger.error({ error }, "Failed to enqueue job");
@@ -70,6 +76,8 @@ app.get("/sse/:tenantId", authMiddleware, async (req, res) => {
 });
 
 startOrderWorker();
+startAnalyticsWorker();
+startNotificationWorker();
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, "DropFlow worker started");

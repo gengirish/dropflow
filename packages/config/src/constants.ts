@@ -32,5 +32,13 @@ export const QUEUE_NAMES = {
   INVENTORY: "inventory-queue",
   INVOICE: "invoice-queue",
   SHIPPING: "shipping-queue",
+  ANALYTICS: "analytics-queue",
+  NOTIFICATION: "notification-queue",
 } as const;
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
+
+export const ANALYTICS = {
+  GATEWAY_FEE_PERCENT: 2,
+  RECOMPUTE_INTERVAL_HOURS: 1,
+  DEFAULT_LOOKBACK_DAYS: 30,
+} as const;

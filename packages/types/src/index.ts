@@ -5,3 +5,4 @@ export * from "./invoice";
 export * from "./shipment";
 export * from "./workflow";
 export * from "./tenant";
+export * from "./analytics";

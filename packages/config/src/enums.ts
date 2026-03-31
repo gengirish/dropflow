@@ -110,3 +110,19 @@ export const POStatus = {
   CANCELLED: "CANCELLED",
 } as const;
 export type POStatus = (typeof POStatus)[keyof typeof POStatus];
+
+export const AnalyticsGranularity = {
+  DAILY: "DAILY",
+  WEEKLY: "WEEKLY",
+  MONTHLY: "MONTHLY",
+} as const;
+export type AnalyticsGranularity = (typeof AnalyticsGranularity)[keyof typeof AnalyticsGranularity];
+
+export const WorkflowNodeType = {
+  ACTION: "action",
+  CONDITION: "condition",
+  DELAY: "delay",
+  WEBHOOK: "webhook",
+  APPROVAL: "approval",
+} as const;
+export type WorkflowNodeType = (typeof WorkflowNodeType)[keyof typeof WorkflowNodeType];

@@ -14,7 +14,12 @@ export const WorkflowRunFilters = z.object({
 export type WorkflowRunFilters = z.infer<typeof WorkflowRunFilters>;
 
 export const EnqueueJobInput = z.object({
-  queue: z.enum(["order-queue", "inventory-queue", "invoice-queue", "shipping-queue"]),
+  queue: z.enum([
+    "order-queue", "inventory-queue", "invoice-queue",
+    "shipping-queue", "analytics-queue", "notification-queue",
+  ]),
+  /** BullMQ job name (e.g. compute-sku-economics, order-confirmation). Defaults to queue id. */
+  jobName: z.string().min(1).optional(),
   payload: z.record(z.unknown()),
   options: z.object({
     delay: z.number().int().nonnegative().optional(),

@@ -26,5 +26,11 @@ export const ORDER_FULFILLMENT_DAG: DAGDefinition = {
       handler: "create-shipment",
       dependsOn: ["generate-po"],
     },
+    {
+      id: "notify-buyer",
+      label: "Notify Buyer",
+      handler: "notify-buyer",
+      dependsOn: ["create-shipment"],
+    },
   ],
 };

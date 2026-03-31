@@ -173,6 +173,7 @@ model Product {
 
   variants            ProductVariant[]
   orderItems          OrderItem[]
+  skuEconomics        SkuEconomics[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -382,6 +383,48 @@ model Payment {
   @@index([tenantId])
   @@index([gatewayPaymentId])
   @@map("payments")
+}
+
+// ── ANALYTICS ─────────────────────────────────────────────
+
+model SkuEconomics {
+  id              String   @id @default(cuid())
+  tenantId        String
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  period          String
+  unitsSold       Int      @default(0)
+  unitsReturned   Int      @default(0)
+  revenuePaise    Int      @default(0)
+  cogsPaise       Int      @default(0)
+  gstPaise        Int      @default(0)
+  shippingPaise   Int      @default(0)
+  gatewayFeePaise Int      @default(0)
+  returnCostPaise Int      @default(0)
+  netProfitPaise  Int      @default(0)
+  marginPercent   Float    @default(0)
+  computedAt      DateTime @default(now())
+
+  @@unique([tenantId, productId, period])
+  @@index([tenantId])
+  @@map("sku_economics")
+}
+
+model DailyRevenue {
+  id            String   @id @default(cuid())
+  tenantId      String
+  date          DateTime @db.Date
+  orderCount    Int      @default(0)
+  revenuePaise  Int      @default(0)
+  cogsPaise     Int      @default(0)
+  profitPaise   Int      @default(0)
+  avgOrderValue Int      @default(0)
+  topSkuId      String?
+  computedAt    DateTime @default(now())
+
+  @@unique([tenantId, date])
+  @@index([tenantId])
+  @@map("daily_revenue")
 }
 
 // ── WORKFLOW ENGINE ───────────────────────────────────────
