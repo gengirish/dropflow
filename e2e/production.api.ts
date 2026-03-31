@@ -229,16 +229,14 @@ test.describe.serial("Production E2E — Full Order Flow", () => {
           {
             id: "step-1",
             type: "action",
-            handler: "validate-stock",
-            label: "Validate Stock",
             position: { x: 250, y: 0 },
+            data: { label: "Validate Stock", handler: "validate-stock" },
           },
           {
             id: "step-2",
             type: "action",
-            handler: "route-to-supplier",
-            label: "Route to Supplier",
             position: { x: 250, y: 200 },
+            data: { label: "Route to Supplier", handler: "route-to-supplier" },
           },
         ],
         edges: [{ id: "e1", source: "step-1", target: "step-2" }],
