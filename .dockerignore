@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.cursor
+.vercel
+docs
+scripts
+*.md
+.env*
+**/.env*
+**/.prisma
+**/dist
+apps/web
+.biome
+.turbo
+**/*.tsbuildinfo
