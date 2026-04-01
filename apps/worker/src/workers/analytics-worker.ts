@@ -1,6 +1,6 @@
 import type { Job } from "bullmq";
 import { prisma } from "@dropflow/db";
-import { ANALYTICS, QUEUE_NAMES } from "@dropflow/config";
+import { ANALYTICS, MARGIN, QUEUE_NAMES } from "@dropflow/config";
 import { createWorker } from "../lib/redis";
 import { logger } from "../lib/logger";
 import { broadcast } from "../sse/broadcaster";
@@ -15,7 +15,15 @@ type ComputeDailyRevenuePayload = {
   date: string;
 };
 
-type AnalyticsJobPayload = ComputeSkuEconomicsPayload | ComputeDailyRevenuePayload;
+type ComputeOrderMarginsPayload = {
+  tenantId: string;
+  orderId: string;
+};
+
+type AnalyticsJobPayload =
+  | ComputeSkuEconomicsPayload
+  | ComputeDailyRevenuePayload
+  | ComputeOrderMarginsPayload;
 
 function parseYearMonth(period: string): { start: Date; endExclusive: Date } {
   const match = /^(\d{4})-(\d{2})$/.exec(period.trim());
@@ -279,6 +287,104 @@ async function computeDailyRevenue(job: Job<ComputeDailyRevenuePayload>) {
   });
 }
 
+async function computeOrderMargins(job: Job<ComputeOrderMarginsPayload>) {
+  const { tenantId, orderId } = job.data;
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, tenantId },
+    include: {
+      items: { include: { product: true } },
+    },
+  });
+
+  if (!order) {
+    logger.warn({ tenantId, orderId }, "compute-order-margins: order not found");
+    return;
+  }
+
+  const sellingPricePaise = order.subtotalPaise;
+  let costPricePaise = 0;
+  let packagingCostPaise = 0;
+
+  for (const item of order.items) {
+    const { product } = item;
+    costPricePaise += product.costPricePaise * item.quantity;
+    const packUnit =
+      product.packagingCostPaise > 0
+        ? product.packagingCostPaise
+        : MARGIN.DEFAULT_PACKAGING_COST_PAISE;
+    packagingCostPaise += packUnit * item.quantity;
+  }
+
+  const gstPaise = order.taxPaise;
+  const shippingCostPaise = order.shippingFeePaise;
+  const gatewayFeePaise = Math.round(
+    (order.totalPaise * ANALYTICS.GATEWAY_FEE_PERCENT) / 100,
+  );
+  const returnReservePaise = Math.round(
+    (order.subtotalPaise * MARGIN.DEFAULT_RETURN_RESERVE_PERCENT) / 100,
+  );
+  const discountPaise = order.discountPaise;
+  const otherCostsPaise = 0;
+
+  const netMarginPaise =
+    sellingPricePaise -
+    costPricePaise -
+    gstPaise -
+    shippingCostPaise -
+    gatewayFeePaise -
+    packagingCostPaise -
+    returnReservePaise -
+    discountPaise;
+
+  const marginPercent =
+    sellingPricePaise > 0 ? (netMarginPaise / sellingPricePaise) * 100 : 0;
+
+  await prisma.orderMarginBreakdown.upsert({
+    where: { orderId },
+    create: {
+      orderId,
+      tenantId,
+      sellingPricePaise,
+      costPricePaise,
+      gstPaise,
+      shippingCostPaise,
+      gatewayFeePaise,
+      packagingCostPaise,
+      returnReservePaise,
+      discountPaise,
+      otherCostsPaise,
+      netMarginPaise,
+      marginPercent,
+      computedAt: new Date(),
+    },
+    update: {
+      sellingPricePaise,
+      costPricePaise,
+      gstPaise,
+      shippingCostPaise,
+      gatewayFeePaise,
+      packagingCostPaise,
+      returnReservePaise,
+      discountPaise,
+      otherCostsPaise,
+      netMarginPaise,
+      marginPercent,
+      computedAt: new Date(),
+    },
+  });
+
+  broadcast(tenantId, {
+    type: "ANALYTICS_COMPUTED",
+    data: {
+      kind: "compute-order-margins",
+      orderId,
+      netMarginPaise,
+      marginPercent,
+    },
+  });
+}
+
 async function processAnalyticsJob(job: Job<AnalyticsJobPayload>) {
   const log = logger.child({ jobId: job.id, jobName: job.name });
 
@@ -301,6 +407,16 @@ async function processAnalyticsJob(job: Job<AnalyticsJobPayload>) {
       );
       await computeDailyRevenue(job as Job<ComputeDailyRevenuePayload>);
       log.info("Daily revenue computation completed");
+      break;
+    }
+    case "compute-order-margins": {
+      const payload = job.data as ComputeOrderMarginsPayload;
+      log.info(
+        { tenantId: payload.tenantId, orderId: payload.orderId },
+        "Computing order margins",
+      );
+      await computeOrderMargins(job as Job<ComputeOrderMarginsPayload>);
+      log.info("Order margin computation completed");
       break;
     }
     default:

@@ -1,13 +1,20 @@
 import { startOrderWorker } from "./workers/order-worker";
 import { startAnalyticsWorker } from "./workers/analytics-worker";
 import { startNotificationWorker } from "./workers/notification-worker";
+import { startRtoWorker } from "./workers/rto-worker";
+import { startInventoryWorker } from "./workers/inventory-worker";
+import { startReorderWorker } from "./workers/reorder-worker";
+import { startSupplierScorecardWorker } from "./workers/supplier-scorecard-worker";
+import { startReconciliationWorker } from "./workers/reconciliation-worker";
+import { startReturnsWorker } from "./workers/returns-worker";
 import express from "express";
 import cors from "cors";
 import { logger } from "./lib/logger";
 import { allQueues } from "./queues";
 import { addSSEClient } from "./sse/broadcaster";
-import { QUEUE_NAMES } from "@dropflow/config";
 import { EnqueueJobInput } from "@dropflow/types";
+import { z } from "zod";
+import { seedDefaultTemplates } from "./lib/default-templates";
 
 const app = express();
 app.use(cors());
@@ -34,6 +41,21 @@ app.get("/health", async (_req, res) => {
   );
 
   res.json({ status: "ok", queues: queueStats });
+});
+
+const SeedNotificationTemplatesInput = z.object({
+  tenantId: z.string().min(1),
+});
+
+app.post("/internal/seed-default-notification-templates", authMiddleware, async (req, res) => {
+  try {
+    const { tenantId } = SeedNotificationTemplatesInput.parse(req.body);
+    await seedDefaultTemplates(tenantId);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Failed to seed default notification templates");
+    res.status(400).json({ error: error instanceof Error ? error.message : "Invalid request" });
+  }
 });
 
 app.post("/internal/enqueue", authMiddleware, async (req, res) => {
@@ -78,6 +100,12 @@ app.get("/sse/:tenantId", authMiddleware, async (req, res) => {
 startOrderWorker();
 startAnalyticsWorker();
 startNotificationWorker();
+startRtoWorker();
+startInventoryWorker();
+startReorderWorker();
+startSupplierScorecardWorker();
+startReturnsWorker();
+startReconciliationWorker();
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, "DropFlow worker started");

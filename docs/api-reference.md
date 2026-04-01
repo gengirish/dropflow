@@ -170,6 +170,17 @@ If an invoice already exists for `orderId`, the handler returns **200** with the
 
 ---
 
+## Analytics – margins
+
+| Method | Path | Auth | Query / body | Success response | HTTP | Error codes (status) |
+|--------|------|------|--------------|------------------|------|----------------------|
+| GET | `/api/v1/analytics/margins` | Yes | Query: `dateFrom`, `dateTo` (ISO date strings), `productId`, `supplierId`, `sortBy` (`margin` \| `revenue` \| `orders`), `sortOrder`, `page`, `pageSize` (see `MarginFilters` in `@dropflow/types`) | `{ success, data: MarginDashboardKPIs & { aggregateWaterfall } }`. `aggregateWaterfall` sums each cost/revenue component across `OrderMarginBreakdown` rows for orders whose `createdAt` falls in the range (default lookback from `ANALYTICS.DEFAULT_LOOKBACK_DAYS` when `dateFrom` omitted). | 200 | `VALIDATION_ERROR` (400); `UNAUTHORIZED` (401); `FETCH_FAILED` (500) |
+| GET | `/api/v1/analytics/margins/[orderId]` | Yes | — | `{ success, data: OrderMarginResponse }` including `waterfall` steps (`MarginWaterfallItem[]`) | 200 | `NOT_FOUND` (404); `UNAUTHORIZED` (401); `FETCH_FAILED` (500) |
+
+Margin rows are produced by the worker job `compute-order-margins` on `analytics-queue` (payload `{ tenantId, orderId }`). Top and worst products are derived by allocating each order’s `netMarginPaise` to line items by share of `subtotalPaise`.
+
+---
+
 ## SSE
 
 | Method | Path | Auth | Success response | Error |
@@ -190,4 +201,5 @@ Uses `RAZORPAY_WEBHOOK_SECRET`. Handles `payment.captured` (creates payment, set
 
 ## Changelog
 
+- **2026-04-01:** Analytics margin dashboard (`GET /api/v1/analytics/margins`, `GET /api/v1/analytics/margins/[orderId]`).
 - **2026-03-30:** Initial API reference.

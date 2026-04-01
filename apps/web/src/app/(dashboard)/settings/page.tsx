@@ -4,7 +4,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Building2, Plug, Workflow } from "lucide-react";
+import { Building2, MessageSquare, Plug, Workflow } from "lucide-react";
 import Link from "next/link";
 
 const sections = [
@@ -14,6 +14,14 @@ const sections = [
 			"Design order automation DAGs with a visual editor and manage versions.",
 		href: "/settings/workflows",
 		icon: Workflow,
+		available: true,
+	},
+	{
+		title: "Notifications",
+		description:
+			"WhatsApp, email, and SMS templates plus delivery logs for order updates.",
+		href: "/settings/notifications",
+		icon: MessageSquare,
 		available: true,
 	},
 	{

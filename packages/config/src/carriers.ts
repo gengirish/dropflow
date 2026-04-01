@@ -12,6 +12,8 @@ export const CARRIERS: Record<ShipmentCarrier, CarrierInfo> = {
   DELHIVERY: { code: "DELHIVERY", displayName: "Delhivery", isDomestic: true, isInternational: false },
   DTDC: { code: "DTDC", displayName: "DTDC", isDomestic: true, isInternational: false },
   BLUEDART: { code: "BLUEDART", displayName: "Blue Dart", isDomestic: true, isInternational: false },
+  ECOM_EXPRESS: { code: "ECOM_EXPRESS", displayName: "Ecom Express", isDomestic: true, isInternational: false },
+  XPRESSBEES: { code: "XPRESSBEES", displayName: "XpressBees", isDomestic: true, isInternational: false },
   EASYPOST_DHL: { code: "EASYPOST_DHL", displayName: "DHL (via EasyPost)", isDomestic: false, isInternational: true },
   EASYPOST_FEDEX: { code: "EASYPOST_FEDEX", displayName: "FedEx (via EasyPost)", isDomestic: false, isInternational: true },
   EASYPOST_UPS: { code: "EASYPOST_UPS", displayName: "UPS (via EasyPost)", isDomestic: false, isInternational: true },

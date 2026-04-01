@@ -16,6 +16,8 @@ export const CreateOrderInput = z.object({
   billingAddress: AddressSchema,
   items: z.array(OrderItemInput).min(1, "At least one item required"),
   currency: z.enum(["INR", "USD", "EUR", "GBP"]).default("INR"),
+  paymentMethod: z.enum(["COD", "PREPAID"]).default("PREPAID"),
+  channelId: z.string().optional(),
   notes: z.string().optional(),
 });
 export type CreateOrderInput = z.infer<typeof CreateOrderInput>;

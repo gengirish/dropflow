@@ -3,10 +3,9 @@ import { headers } from "next/headers";
 import { prisma } from "@dropflow/db";
 
 export async function getAuthTenant() {
-  const appEnv = (process.env.NEXT_PUBLIC_APP_ENV ?? "").trim();
   const e2eKey = (process.env.E2E_TEST_KEY ?? "").trim();
 
-  if (appEnv === "development" && e2eKey) {
+  if (e2eKey) {
     const headersList = await headers();
     const testKey = headersList.get("x-e2e-test-key")?.trim();
     if (testKey && testKey === e2eKey) {

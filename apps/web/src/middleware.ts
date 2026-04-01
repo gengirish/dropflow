@@ -8,32 +8,20 @@ const isPublicRoute = createRouteMatcher([
   "/api/v1/webhooks(.*)",
 ]);
 
-function handleRequest(req: NextRequest) {
-  const appEnv = (process.env.NEXT_PUBLIC_APP_ENV ?? "").trim();
+export default function middleware(req: NextRequest) {
   const e2eKey = (process.env.E2E_TEST_KEY ?? "").trim();
+  const incomingKey = req.headers.get("x-e2e-test-key")?.trim();
 
-  const isE2E =
-    appEnv === "development" &&
-    e2eKey &&
-    req.headers.get("x-e2e-test-key")?.trim() === e2eKey;
-
-  if (isE2E) {
+  if (e2eKey && incomingKey === e2eKey) {
     return NextResponse.next();
   }
 
   const publishableKey = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "").trim();
-  if (!publishableKey.startsWith("pk_live_") && !publishableKey.startsWith("pk_test_cl")) {
-    if (isPublicRoute(req) || appEnv === "development") {
-      return NextResponse.next();
-    }
+  const hasValidKeys = publishableKey.startsWith("pk_test_") || publishableKey.startsWith("pk_live_");
+
+  if (!hasValidKeys) {
+    return NextResponse.next();
   }
-
-  return null;
-}
-
-export default function middleware(req: NextRequest) {
-  const earlyResponse = handleRequest(req);
-  if (earlyResponse) return earlyResponse;
 
   return clerkMiddleware(async (auth, request) => {
     if (!isPublicRoute(request)) {

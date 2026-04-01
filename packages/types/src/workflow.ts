@@ -17,6 +17,8 @@ export const EnqueueJobInput = z.object({
   queue: z.enum([
     "order-queue", "inventory-queue", "invoice-queue",
     "shipping-queue", "analytics-queue", "notification-queue",
+    "rto-queue", "reorder-queue", "reconciliation-queue",
+    "returns-queue", "channel-sync-queue", "supplier-scorecard-queue",
   ]),
   /** BullMQ job name (e.g. compute-sku-economics, order-confirmation). Defaults to queue id. */
   jobName: z.string().min(1).optional(),

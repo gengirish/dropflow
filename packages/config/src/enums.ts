@@ -74,6 +74,8 @@ export const ShipmentCarrier = {
   DELHIVERY: "DELHIVERY",
   DTDC: "DTDC",
   BLUEDART: "BLUEDART",
+  ECOM_EXPRESS: "ECOM_EXPRESS",
+  XPRESSBEES: "XPRESSBEES",
   EASYPOST_DHL: "EASYPOST_DHL",
   EASYPOST_FEDEX: "EASYPOST_FEDEX",
   EASYPOST_UPS: "EASYPOST_UPS",
@@ -126,3 +128,122 @@ export const WorkflowNodeType = {
   APPROVAL: "approval",
 } as const;
 export type WorkflowNodeType = (typeof WorkflowNodeType)[keyof typeof WorkflowNodeType];
+
+export const PaymentMethod = {
+  COD: "COD",
+  PREPAID: "PREPAID",
+} as const;
+export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
+
+export const RtoRiskLevel = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+} as const;
+export type RtoRiskLevel = (typeof RtoRiskLevel)[keyof typeof RtoRiskLevel];
+
+export const SalesChannelType = {
+  WEBSITE: "WEBSITE",
+  AMAZON: "AMAZON",
+  FLIPKART: "FLIPKART",
+  MEESHO: "MEESHO",
+  MYNTRA: "MYNTRA",
+  SHOPIFY: "SHOPIFY",
+  CUSTOM: "CUSTOM",
+} as const;
+export type SalesChannelType = (typeof SalesChannelType)[keyof typeof SalesChannelType];
+
+export const ChannelSyncStatus = {
+  CONNECTED: "CONNECTED",
+  DISCONNECTED: "DISCONNECTED",
+  SYNCING: "SYNCING",
+  ERROR: "ERROR",
+  PAUSED: "PAUSED",
+} as const;
+export type ChannelSyncStatus = (typeof ChannelSyncStatus)[keyof typeof ChannelSyncStatus];
+
+export const ReturnStatus = {
+  REQUESTED: "REQUESTED",
+  APPROVED: "APPROVED",
+  PICKUP_SCHEDULED: "PICKUP_SCHEDULED",
+  PICKED_UP: "PICKED_UP",
+  RECEIVED: "RECEIVED",
+  QC_PASSED: "QC_PASSED",
+  QC_FAILED: "QC_FAILED",
+  RESTOCKED: "RESTOCKED",
+  DISPOSED: "DISPOSED",
+  REFUND_INITIATED: "REFUND_INITIATED",
+  REFUND_COMPLETED: "REFUND_COMPLETED",
+  REJECTED: "REJECTED",
+} as const;
+export type ReturnStatus = (typeof ReturnStatus)[keyof typeof ReturnStatus];
+
+export const ReturnReason = {
+  DEFECTIVE: "DEFECTIVE",
+  WRONG_ITEM: "WRONG_ITEM",
+  SIZE_ISSUE: "SIZE_ISSUE",
+  DAMAGED_IN_TRANSIT: "DAMAGED_IN_TRANSIT",
+  NOT_AS_DESCRIBED: "NOT_AS_DESCRIBED",
+  CHANGED_MIND: "CHANGED_MIND",
+  OTHER: "OTHER",
+} as const;
+export type ReturnReason = (typeof ReturnReason)[keyof typeof ReturnReason];
+
+export const RefundMethod = {
+  ORIGINAL_PAYMENT: "ORIGINAL_PAYMENT",
+  STORE_CREDIT: "STORE_CREDIT",
+  BANK_TRANSFER: "BANK_TRANSFER",
+} as const;
+export type RefundMethod = (typeof RefundMethod)[keyof typeof RefundMethod];
+
+export const RefundStatus = {
+  INITIATED: "INITIATED",
+  PROCESSING: "PROCESSING",
+  COMPLETED: "COMPLETED",
+  FAILED: "FAILED",
+} as const;
+export type RefundStatus = (typeof RefundStatus)[keyof typeof RefundStatus];
+
+export const ReconciliationStatus = {
+  MATCHED: "MATCHED",
+  UNMATCHED: "UNMATCHED",
+  DISCREPANCY: "DISCREPANCY",
+  MANUAL_OVERRIDE: "MANUAL_OVERRIDE",
+} as const;
+export type ReconciliationStatus = (typeof ReconciliationStatus)[keyof typeof ReconciliationStatus];
+
+export const ReconciliationType = {
+  PAYMENT_GATEWAY: "PAYMENT_GATEWAY",
+  COD_CARRIER: "COD_CARRIER",
+  SUPPLIER_INVOICE: "SUPPLIER_INVOICE",
+} as const;
+export type ReconciliationType = (typeof ReconciliationType)[keyof typeof ReconciliationType];
+
+export const InventoryTxnType = {
+  SALE: "SALE",
+  RETURN: "RETURN",
+  ADJUSTMENT: "ADJUSTMENT",
+  RESTOCK: "RESTOCK",
+  TRANSFER: "TRANSFER",
+  RESERVE: "RESERVE",
+  RELEASE: "RELEASE",
+} as const;
+export type InventoryTxnType = (typeof InventoryTxnType)[keyof typeof InventoryTxnType];
+
+export const IncidentType = {
+  LATE_DELIVERY: "LATE_DELIVERY",
+  DEFECT: "DEFECT",
+  WRONG_ITEM: "WRONG_ITEM",
+  SHORT_SHIPMENT: "SHORT_SHIPMENT",
+  QUALITY_ISSUE: "QUALITY_ISSUE",
+} as const;
+export type IncidentType = (typeof IncidentType)[keyof typeof IncidentType];
+
+export const IncidentSeverity = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+} as const;
+export type IncidentSeverity = (typeof IncidentSeverity)[keyof typeof IncidentSeverity];

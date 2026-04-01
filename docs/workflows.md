@@ -67,6 +67,7 @@ Queue name constants come from `@dropflow/config` (`QUEUE_NAMES`) and are wired 
 | `inventory-queue` | `QUEUE_NAMES.INVENTORY` | Queue created; no worker processor in-repo at time of writing |
 | `invoice-queue` | `QUEUE_NAMES.INVOICE` | Same |
 | `shipping-queue` | `QUEUE_NAMES.SHIPPING` | Same |
+| `analytics-queue` | `QUEUE_NAMES.ANALYTICS` | Analytics jobs; worker in `apps/worker/src/workers/analytics-worker.ts` |
 
 **Order job payload** (typed in `order-worker.ts` as `OrderJobPayload`):
 
@@ -75,6 +76,14 @@ Queue name constants come from `@dropflow/config` (`QUEUE_NAMES`) and are wired 
 ```
 
 Jobs are enqueued from the web app (e.g. order creation) via the worker `POST /internal/enqueue` with body matching `EnqueueJobInput` in `@dropflow/types` (`queue` + `payload` + optional `options`). Non-order queues accept the same envelope; `payload` is `Record<string, unknown>` until those flows define a stricter shape.
+
+**Analytics job names** (`analytics-worker.ts`):
+
+| Job name | Payload | Effect |
+|----------|---------|--------|
+| `compute-sku-economics` | `{ tenantId, period }` (`period` = `YYYY-MM`) | Upserts `SkuEconomics` per product; SSE `ANALYTICS_COMPUTED` with `kind: "compute-sku-economics"` |
+| `compute-daily-revenue` | `{ tenantId, date }` (`date` = `YYYY-MM-DD`) | Upserts `DailyRevenue`; SSE with `kind: "compute-daily-revenue"` |
+| `compute-order-margins` | `{ tenantId, orderId }` | Upserts `OrderMarginBreakdown` from order lines and constants (`ANALYTICS.GATEWAY_FEE_PERCENT`, `MARGIN.DEFAULT_PACKAGING_COST_PAISE`, `MARGIN.DEFAULT_RETURN_RESERVE_PERCENT`); SSE with `kind: "compute-order-margins"` |
 
 ## SSE events
 
@@ -98,6 +107,7 @@ Workflow-related `type` values emitted by the executor:
 | `WORKFLOW_STEP` | Start, completion, or failure of a step | `workflowRunId`, `step` (node id), `status`: `"running"` \| `"completed"` \| `"failed"`; `data` absent for `running`; on `completed`, handler `result.data`; on `failed`, `{ error: string }` |
 | `WORKFLOW_COMPLETED` | All steps succeeded | `workflowRunId`; `data`: `{ orderId }` |
 | `WORKFLOW_FAILED` | Step returned `success: false` | `workflowRunId`; `data`: `{ failedStep: string, error?: string }` |
+| `ANALYTICS_COMPUTED` | After an analytics worker job finishes | `data`: `{ kind: "compute-sku-economics" \| "compute-daily-revenue" \| "compute-order-margins", ... }` (fields depend on `kind`) |
 
 If no SSE clients are connected for the tenant, broadcasts are skipped (no-op aside from logging).
 
@@ -110,4 +120,5 @@ If no SSE clients are connected for the tenant, broadcasts are skipped (no-op as
 
 ## Changelog
 
+- **2026-04-01:** Documented `analytics-queue` jobs including `compute-order-margins` and `ANALYTICS_COMPUTED` SSE.
 - **2026-03-30:** Initial workflow engine with 4-step order fulfillment DAG.

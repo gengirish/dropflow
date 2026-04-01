@@ -123,7 +123,9 @@ export async function POST(req: NextRequest) {
 				shippingAddress: input.shippingAddress as Prisma.InputJsonValue,
 				billingAddress: input.billingAddress as Prisma.InputJsonValue,
 				status: "PENDING",
+				paymentMethod: input.paymentMethod,
 				currency: input.currency,
+				channelId: input.channelId,
 				subtotalPaise,
 				taxPaise,
 				totalPaise,
@@ -145,21 +147,18 @@ export async function POST(req: NextRequest) {
 		const workerUrl = process.env.FLY_WORKER_URL ?? "http://localhost:3001";
 		const workerSecret = process.env.WORKER_SECRET ?? "dev-secret-change-me-in-production";
 
-		try {
-			await fetch(`${workerUrl}/internal/enqueue`, {
+		const enqueueJob = (queue: string, payload: Record<string, unknown>, jobName?: string) =>
+			fetch(`${workerUrl}/internal/enqueue`, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"x-worker-secret": workerSecret,
-				},
-				body: JSON.stringify({
-					queue: "order-queue",
-					payload: { tenantId, orderId: order.id },
-				}),
-			});
-		} catch (enqueueError) {
-			console.error("Failed to enqueue order job:", enqueueError);
-		}
+				headers: { "Content-Type": "application/json", "x-worker-secret": workerSecret },
+				body: JSON.stringify({ queue, jobName, payload }),
+			}).catch((e) => console.error(`Failed to enqueue ${queue}:`, e));
+
+		await Promise.allSettled([
+			enqueueJob("order-queue", { tenantId, orderId: order.id }),
+			enqueueJob("rto-queue", { tenantId, orderId: order.id }, "score-order"),
+			enqueueJob("analytics-queue", { tenantId, orderId: order.id }, "compute-order-margins"),
+		]);
 
 		return ok(order, 201);
 	} catch (e) {

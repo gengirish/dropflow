@@ -79,6 +79,8 @@ enum ShipmentCarrier {
   DELHIVERY
   DTDC
   BLUEDART
+  ECOM_EXPRESS
+  XPRESSBEES
   EASYPOST_DHL
   EASYPOST_FEDEX
   EASYPOST_UPS
@@ -92,7 +94,92 @@ enum NotificationChannel {
   IN_APP
 }
 
-// ── TENANT & USERS ────────────────────────────────────────
+enum PaymentMethod {
+  COD
+  PREPAID
+}
+
+enum RtoRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SalesChannelType {
+  WEBSITE
+  AMAZON
+  FLIPKART
+  MEESHO
+  MYNTRA
+  SHOPIFY
+  CUSTOM
+}
+
+enum ChannelSyncStatus {
+  CONNECTED
+  DISCONNECTED
+  SYNCING
+  ERROR
+  PAUSED
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  PICKUP_SCHEDULED
+  PICKED_UP
+  RECEIVED
+  QC_PASSED
+  QC_FAILED
+  RESTOCKED
+  DISPOSED
+  REFUND_INITIATED
+  REFUND_COMPLETED
+  REJECTED
+}
+
+enum ReturnReason {
+  DEFECTIVE
+  WRONG_ITEM
+  SIZE_ISSUE
+  DAMAGED_IN_TRANSIT
+  NOT_AS_DESCRIBED
+  CHANGED_MIND
+  OTHER
+}
+
+enum RefundMethod {
+  ORIGINAL_PAYMENT
+  STORE_CREDIT
+  BANK_TRANSFER
+}
+
+enum RefundStatus {
+  INITIATED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationStatus {
+  MATCHED
+  UNMATCHED
+  DISCREPANCY
+  MANUAL_OVERRIDE
+}
+
+enum InventoryTxnType {
+  SALE
+  RETURN
+  ADJUSTMENT
+  RESTOCK
+  TRANSFER
+  RESERVE
+  RELEASE
+}
+
+// ── TENANT ───────────────────────────────────────────────
 
 model Tenant {
   id                String     @id @default(cuid())
@@ -110,13 +197,16 @@ model Tenant {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  suppliers         Supplier[]
-  products          Product[]
-  orders            Order[]
-  invoices          Invoice[]
-  shipments         Shipment[]
-  workflowDefs      WorkflowDefinition[]
-  workflowRuns      WorkflowRun[]
+  suppliers              Supplier[]
+  products               Product[]
+  orders                 Order[]
+  invoices               Invoice[]
+  shipments              Shipment[]
+  workflowDefs           WorkflowDefinition[]
+  workflowRuns           WorkflowRun[]
+  salesChannels          SalesChannel[]
+  returnRequests         ReturnRequest[]
+  notificationTemplates  NotificationTemplate[]
 
   @@map("tenants")
 }
@@ -140,6 +230,8 @@ model Supplier {
 
   products       Product[]
   purchaseOrders PurchaseOrder[]
+  scorecards     SupplierScorecard[]
+  incidents      SupplierIncident[]
 
   @@index([tenantId])
   @@map("suppliers")
@@ -164,6 +256,10 @@ model Product {
   stockQty            Int       @default(0)
   reservedQty         Int       @default(0)
   lowStockThreshold   Int       @default(10)
+  reorderPoint        Int       @default(0)
+  salesVelocityDaily  Float     @default(0)
+  packagingCostPaise  Int       @default(0)
+  weightGrams         Int       @default(0)
   isActive            Boolean   @default(true)
   isListed            Boolean   @default(true)
   images              String[]
@@ -171,9 +267,14 @@ model Product {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  variants            ProductVariant[]
-  orderItems          OrderItem[]
-  skuEconomics        SkuEconomics[]
+  variants               ProductVariant[]
+  orderItems             OrderItem[]
+  skuEconomics           SkuEconomics[]
+  channelListings        ChannelListing[]
+  channelStockAllocations ChannelStockAllocation[]
+  inventoryTransactions  InventoryTransaction[]
+  reorderRule            ReorderRule?
+  reorderAlerts          ReorderAlert[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -202,26 +303,32 @@ model ProductVariant {
 // ── ORDERS ────────────────────────────────────────────────
 
 model Order {
-  id                String      @id @default(cuid())
+  id                String        @id @default(cuid())
   tenantId          String
-  tenant            Tenant      @relation(fields: [tenantId], references: [id])
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
   orderNumber       String
   buyerName         String
   buyerEmail        String
   buyerPhone        String
   shippingAddress   Json
   billingAddress    Json
-  status            OrderStatus @default(PENDING)
-  currency          Currency    @default(INR)
+  status            OrderStatus   @default(PENDING)
+  paymentMethod     PaymentMethod @default(PREPAID)
+  currency          Currency      @default(INR)
   subtotalPaise     Int
-  discountPaise     Int         @default(0)
-  shippingFeePaise  Int         @default(0)
+  discountPaise     Int           @default(0)
+  shippingFeePaise  Int           @default(0)
   totalPaise        Int
   taxPaise          Int
   notes             String?
   workflowRunId     String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  channelId         String?
+  channel           SalesChannel? @relation(fields: [channelId], references: [id])
+  rtoScore          Float?
+  rtoRiskLevel      RtoRiskLevel?
+  isRtoNudgeSent    Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   items             OrderItem[]
   purchaseOrder     PurchaseOrder?
@@ -229,10 +336,14 @@ model Order {
   shipment          Shipment?
   payments          Payment[]
   statusHistory     OrderStatusHistory[]
+  marginBreakdown   OrderMarginBreakdown?
+  rtoScoreLog       RtoScoreLog?
+  returnRequests    ReturnRequest[]
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  @@index([buyerPhone])
   @@map("orders")
 }
 
@@ -468,4 +579,481 @@ model WorkflowRun {
   @@index([tenantId])
   @@index([workflowDefinitionId])
   @@map("workflow_runs")
+}
+
+// ── RTO PREDICTION ENGINE ────────────────────────────────
+
+model RtoScoreLog {
+  id            String       @id @default(cuid())
+  orderId       String       @unique
+  order         Order        @relation(fields: [orderId], references: [id])
+  tenantId      String
+  score         Float
+  riskLevel     RtoRiskLevel
+  signals       Json
+  nudgeChannel  String?
+  nudgeSentAt   DateTime?
+  nudgeResult   String?
+  actualOutcome String?
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId])
+  @@index([riskLevel])
+  @@map("rto_score_logs")
+}
+
+model PincodeDeliverability {
+  id              String   @id @default(cuid())
+  pincode         String   @unique
+  totalShipments  Int      @default(0)
+  totalDelivered  Int      @default(0)
+  totalRto        Int      @default(0)
+  deliveryRate    Float    @default(0)
+  avgDeliveryDays Float    @default(0)
+  lastUpdatedAt   DateTime @default(now())
+
+  @@map("pincode_deliverability")
+}
+
+// ── MARGIN WATERFALL ─────────────────────────────────────
+
+model OrderMarginBreakdown {
+  id                  String   @id @default(cuid())
+  orderId             String   @unique
+  order               Order    @relation(fields: [orderId], references: [id])
+  tenantId            String
+  sellingPricePaise   Int
+  costPricePaise      Int
+  gstPaise            Int
+  shippingCostPaise   Int
+  gatewayFeePaise     Int
+  packagingCostPaise  Int
+  returnReservePaise  Int      @default(0)
+  discountPaise       Int      @default(0)
+  otherCostsPaise     Int      @default(0)
+  netMarginPaise      Int
+  marginPercent       Float
+  computedAt          DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, computedAt])
+  @@map("order_margin_breakdowns")
+}
+
+// ── MULTI-CHANNEL INVENTORY ──────────────────────────────
+
+model SalesChannel {
+  id             String           @id @default(cuid())
+  tenantId       String
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  name           String
+  type           SalesChannelType
+  status         ChannelSyncStatus @default(DISCONNECTED)
+  credentials    Json             @default("{}")
+  bufferPercent  Int              @default(100)
+  configJson     Json             @default("{}")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  listings         ChannelListing[]
+  stockAllocations ChannelStockAllocation[]
+  orders           Order[]
+
+  @@unique([tenantId, type, name])
+  @@index([tenantId])
+  @@map("sales_channels")
+}
+
+model ChannelListing {
+  id                String       @id @default(cuid())
+  tenantId          String
+  channelId         String
+  channel           SalesChannel @relation(fields: [channelId], references: [id])
+  productId         String
+  product           Product      @relation(fields: [productId], references: [id])
+  channelSku        String?
+  channelPricePaise Int?
+  isActive          Boolean      @default(true)
+  lastSyncedAt      DateTime?
+  syncStatus        String       @default("PENDING")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([channelId, productId])
+  @@index([tenantId])
+  @@map("channel_listings")
+}
+
+model ChannelStockAllocation {
+  id           String       @id @default(cuid())
+  tenantId     String
+  channelId    String
+  channel      SalesChannel @relation(fields: [channelId], references: [id])
+  productId    String
+  product      Product      @relation(fields: [productId], references: [id])
+  allocatedQty Int          @default(0)
+  reservedQty  Int          @default(0)
+  bufferQty    Int          @default(0)
+  lastSyncedAt DateTime?
+
+  @@unique([channelId, productId])
+  @@index([tenantId])
+  @@map("channel_stock_allocations")
+}
+
+model InventoryTransaction {
+  id             String           @id @default(cuid())
+  tenantId       String
+  productId      String
+  product        Product          @relation(fields: [productId], references: [id])
+  channelId      String?
+  type           InventoryTxnType
+  quantity       Int
+  referenceType  String?
+  referenceId    String?
+  note           String?
+  createdAt      DateTime         @default(now())
+
+  @@index([tenantId])
+  @@index([productId])
+  @@index([tenantId, createdAt])
+  @@map("inventory_transactions")
+}
+
+// ── SUPPLIER SCORECARDS ──────────────────────────────────
+
+model SupplierScorecard {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  supplierId           String
+  supplier             Supplier @relation(fields: [supplierId], references: [id])
+  period               String
+  totalPOs             Int      @default(0)
+  onTimePOs            Int      @default(0)
+  latePOs              Int      @default(0)
+  totalUnits           Int      @default(0)
+  defectiveUnits       Int      @default(0)
+  returnedUnits        Int      @default(0)
+  avgLeadTimeDays      Float    @default(0)
+  promisedLeadTimeDays Float    @default(0)
+  fulfillmentRate      Float    @default(0)
+  defectRate           Float    @default(0)
+  returnRate           Float    @default(0)
+  overallScore         Float    @default(0)
+  computedAt           DateTime @default(now())
+
+  @@unique([tenantId, supplierId, period])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@map("supplier_scorecards")
+}
+
+model SupplierIncident {
+  id          String    @id @default(cuid())
+  tenantId    String
+  supplierId  String
+  supplier    Supplier  @relation(fields: [supplierId], references: [id])
+  type        String
+  severity    String    @default("MEDIUM")
+  description String?
+  poId        String?
+  orderId     String?
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([supplierId])
+  @@map("supplier_incidents")
+}
+
+// ── SMART REORDER ENGINE ─────────────────────────────────
+
+model ReorderRule {
+  id              String   @id @default(cuid())
+  tenantId        String
+  productId       String   @unique
+  product         Product  @relation(fields: [productId], references: [id])
+  reorderPoint    Int
+  reorderQty      Int
+  maxStockQty     Int      @default(0)
+  leadTimeDays    Int?
+  isAutoPoEnabled Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("reorder_rules")
+}
+
+model ReorderAlert {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  productId            String
+  product              Product   @relation(fields: [productId], references: [id])
+  currentStock         Int
+  reorderPoint         Int
+  daysOfStockRemaining Float
+  suggestedQty         Int
+  supplierId           String?
+  autoPoCreated        Boolean   @default(false)
+  purchaseOrderId      String?
+  acknowledgedAt       DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("reorder_alerts")
+}
+
+// ── PINCODE SERVICEABILITY & RATE ENGINE ─────────────────
+
+model PincodeServiceability {
+  id              String          @id @default(cuid())
+  pincode         String
+  carrier         ShipmentCarrier
+  isServiceable   Boolean         @default(true)
+  isCodAvailable  Boolean         @default(true)
+  estimatedDays   Int?
+  zone            String?
+  lastVerifiedAt  DateTime        @default(now())
+
+  @@unique([pincode, carrier])
+  @@index([pincode])
+  @@map("pincode_serviceability")
+}
+
+model CarrierRate {
+  id                      String          @id @default(cuid())
+  tenantId                String
+  carrier                 ShipmentCarrier
+  zone                    String
+  minWeightGrams          Int
+  maxWeightGrams          Int
+  basePricePaise          Int
+  additionalPerGramPaise  Float           @default(0)
+  codChargePaise          Int             @default(0)
+  fuelSurchargePercent    Float           @default(0)
+  isActive                Boolean         @default(true)
+  validFrom               DateTime
+  validTo                 DateTime?
+  createdAt               DateTime        @default(now())
+
+  @@index([tenantId])
+  @@index([carrier, zone])
+  @@map("carrier_rates")
+}
+
+// ── NOTIFICATIONS & WHATSAPP ─────────────────────────────
+
+model NotificationTemplate {
+  id           String              @id @default(cuid())
+  tenantId     String
+  tenant       Tenant              @relation(fields: [tenantId], references: [id])
+  channel      NotificationChannel
+  triggerEvent String
+  name         String
+  templateId   String?
+  templateBody String
+  variables    Json                @default("[]")
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  logs         NotificationLog[]
+
+  @@unique([tenantId, channel, triggerEvent])
+  @@index([tenantId])
+  @@map("notification_templates")
+}
+
+model NotificationLog {
+  id                String               @id @default(cuid())
+  tenantId          String
+  orderId           String?
+  channel           NotificationChannel
+  templateId        String?
+  template          NotificationTemplate? @relation(fields: [templateId], references: [id])
+  recipientPhone    String?
+  recipientEmail    String?
+  status            String               @default("QUEUED")
+  providerMessageId String?
+  errorMessage      String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  createdAt         DateTime             @default(now())
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("notification_logs")
+}
+
+// ── RETURNS & REFUNDS ────────────────────────────────────
+
+model ReturnRequest {
+  id               String       @id @default(cuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  orderId          String
+  order            Order        @relation(fields: [orderId], references: [id])
+  returnNumber     String
+  status           ReturnStatus @default(REQUESTED)
+  reason           ReturnReason
+  customerNotes    String?
+  returnAwbNumber  String?
+  returnCarrier    String?
+  returnLabelUrl   String?
+  qcNotes          String?
+  qcPassedAt       DateTime?
+  qcFailedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  items            ReturnItem[]
+  refund           Refund?
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("return_requests")
+}
+
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id])
+  tenantId        String
+  orderItemId     String
+  productId       String
+  quantity        Int
+  reason          ReturnReason
+  condition       String        @default("UNUSED")
+  restocked       Boolean       @default(false)
+
+  @@index([tenantId])
+  @@map("return_items")
+}
+
+model Refund {
+  id              String        @id @default(cuid())
+  returnRequestId String        @unique
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id])
+  tenantId        String
+  orderId         String
+  method          RefundMethod  @default(ORIGINAL_PAYMENT)
+  amountPaise     Int
+  gatewayRefundId String?
+  status          RefundStatus  @default(INITIATED)
+  processedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@map("refunds")
+}
+
+// ── RECONCILIATION ───────────────────────────────────────
+
+model Settlement {
+  id                String   @id @default(cuid())
+  tenantId          String
+  gateway           String
+  settlementId      String
+  settlementDate    DateTime
+  totalAmountPaise  Int
+  feePaise          Int      @default(0)
+  taxOnFeePaise     Int      @default(0)
+  netAmountPaise    Int
+  utrNumber         String?
+  bankReference     String?
+  status            String   @default("PENDING")
+  rawJson           Json     @default("{}")
+  createdAt         DateTime @default(now())
+
+  items             SettlementItem[]
+
+  @@unique([tenantId, gateway, settlementId])
+  @@index([tenantId])
+  @@map("settlements")
+}
+
+model SettlementItem {
+  id               String     @id @default(cuid())
+  settlementId     String
+  settlement       Settlement @relation(fields: [settlementId], references: [id])
+  tenantId         String
+  gatewayPaymentId String
+  orderId          String?
+  amountPaise      Int
+  feePaise         Int        @default(0)
+  taxPaise         Int        @default(0)
+  netPaise         Int
+  isMatched        Boolean    @default(false)
+  matchedPaymentId String?
+  createdAt        DateTime   @default(now())
+
+  @@index([tenantId])
+  @@index([gatewayPaymentId])
+  @@map("settlement_items")
+}
+
+model CodRemittance {
+  id               String          @id @default(cuid())
+  tenantId         String
+  carrier          ShipmentCarrier
+  remittanceId     String
+  remittanceDate   DateTime
+  totalAmountPaise Int
+  deductionsPaise  Int             @default(0)
+  netAmountPaise   Int
+  utrNumber        String?
+  bankReference    String?
+  status           String          @default("PENDING")
+  rawJson          Json            @default("{}")
+  createdAt        DateTime        @default(now())
+
+  items            CodRemittanceItem[]
+
+  @@unique([tenantId, carrier, remittanceId])
+  @@index([tenantId])
+  @@map("cod_remittances")
+}
+
+model CodRemittanceItem {
+  id             String        @id @default(cuid())
+  remittanceId   String
+  remittance     CodRemittance @relation(fields: [remittanceId], references: [id])
+  tenantId       String
+  awbNumber      String
+  orderId        String?
+  amountPaise    Int
+  codChargePaise Int           @default(0)
+  netPaise       Int
+  isMatched      Boolean       @default(false)
+  matchedOrderId String?
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([awbNumber])
+  @@map("cod_remittance_items")
+}
+
+model ReconciliationRecord {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  type                String
+  referenceId         String
+  matchedId           String?
+  expectedAmountPaise Int
+  actualAmountPaise   Int
+  differencePaise     Int                  @default(0)
+  status              ReconciliationStatus @default(UNMATCHED)
+  notes               String?
+  resolvedAt          DateTime?
+  resolvedBy          String?
+  createdAt           DateTime             @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@map("reconciliation_records")
 }
