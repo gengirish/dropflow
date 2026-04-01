@@ -1,10 +1,12 @@
 node_modules
+**/node_modules
 .next
 .git
 .cursor
 .vercel
 docs
 scripts
+e2e
 *.md
 .env*
 **/.env*
@@ -14,3 +16,5 @@ apps/web
 .biome
 .turbo
 **/*.tsbuildinfo
+.gitattributes
+.editorconfig
